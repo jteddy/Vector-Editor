@@ -1,6 +1,6 @@
 #!/bin/bash
 echo "================================"
-echo " Recoil Editor — Setup"
+echo " Vector Editor — Setup"
 echo "================================"
 echo ""
 

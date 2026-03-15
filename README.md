@@ -1,6 +1,6 @@
-# Vecoil-Editor
+# vector-editor
 
-A web-based recoil pattern editor. Runs as a local server — open from any browser on your network. Built to run on a Raspberry Pi or any machine alongside your game setup.
+A web-based recoil vector editor. Runs as a local server — open from any browser on your network. Built to run on a Raspberry Pi or any machine alongside your game setup.
 
 ## Stack
 
@@ -63,7 +63,7 @@ Patterns (vectors) are stored in `patterns/<game>/<weapon>.txt` and are fully co
 ## Project Structure
 
 ```
-recoil-editor/
+vector-editor/
 ├── app.py              ← FastAPI backend
 ├── static/
 │   └── index.html      ← entire frontend (self-contained)
@@ -112,15 +112,15 @@ tail -f recoil.log
 
 ### Auto-start on boot (Raspberry Pi — systemd)
 
-Create `/etc/systemd/system/recoil-editor.service`:
+Create `/etc/systemd/system/vector-editor.service`:
 
 ```ini
 [Unit]
-Description=Recoil Editor
+Description=Vector Editor
 After=network.target
 
 [Service]
-WorkingDirectory=/home/pi/recoil-editor
+WorkingDirectory=/home/pi/vector-editor
 ExecStart=/usr/bin/python3 app.py
 Restart=always
 User=pi
@@ -132,7 +132,7 @@ WantedBy=multi-user.target
 Then enable it:
 
 ```bash
-sudo systemctl enable recoil-editor
-sudo systemctl start recoil-editor
-sudo systemctl status recoil-editor
+sudo systemctl enable vector-editor
+sudo systemctl start vector-editor
+sudo systemctl status vector-editor
 ```

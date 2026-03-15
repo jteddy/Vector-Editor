@@ -2,7 +2,7 @@
 cd /d "%~dp0"
 
 echo ================================
-echo  Recoil Editor
+echo  Vector Editor
 echo ================================
 echo.
 

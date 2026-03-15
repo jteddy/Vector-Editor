@@ -1,5 +1,5 @@
 """
-Recoil Pattern Editor — Web Backend
+Vector Editor — Web Backend
 ------------------------------------
 FastAPI server that:
   - Serves the web UI at http://0.0.0.0:8000
@@ -20,7 +20,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, PlainTextResponse
 import os
 
-app = FastAPI(title="Recoil Editor")
+app = FastAPI(title="Vector Editor")
 
 PATTERNS_DIR = os.path.join(os.path.dirname(__file__), "patterns")
 os.makedirs(PATTERNS_DIR, exist_ok=True)
@@ -92,7 +92,7 @@ def index():
 if __name__ == "__main__":
     import uvicorn
     print("\n================================")
-    print(" Recoil Editor")
+    print(" Vector Editor")
     print(" http://localhost:8000")
     print(" Ctrl+C to stop")
     print("================================\n")
