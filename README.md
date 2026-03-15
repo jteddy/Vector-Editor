@@ -1,4 +1,4 @@
-# recoil-editor
+# Vecoil-Editor
 
 A web-based recoil pattern editor. Runs as a local server — open from any browser on your network. Built to run on a Raspberry Pi or any machine alongside your game setup.
 
