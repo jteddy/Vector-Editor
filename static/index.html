@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Recoil Editor</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500&family=Syne:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg0:#0e0f11;--bg1:#161719;--bg2:#1e2023;--bg3:#26292e;
+  --border:#2e3138;--border2:#3a3f48;
+  --text:#e8eaed;--text2:#7c8490;--text3:#4a5060;
+  --accent:#4d9cff;--accent2:#1a6cd4;
+  --hot:#ff4d6d;--hot2:#c0392b;
+  --green:#34d399;
+  --font-ui:'Syne',sans-serif;
+  --font-mono:'JetBrains Mono',monospace;
+}
+html,body{height:100%;background:var(--bg0);color:var(--text);font-family:var(--font-ui);font-size:13px;overflow:hidden}
+
+/* ── Shell ── */
+#app{display:flex;flex-direction:column;height:100vh;overflow:hidden}
+
+#titlebar{
+  height:40px;flex-shrink:0;
+  background:var(--bg1);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;padding:0 14px;gap:10px
+}
+#titlebar h1{font-size:12px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--text2)}
+#titlebar .sep{flex:1}
+#ready-pill{font-family:var(--font-mono);font-size:10px;color:var(--green);background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.2);border-radius:20px;padding:2px 10px}
+
+/* ── Body row ── */
+#body{display:flex;flex:1;min-height:0;overflow:hidden}
+
+/* ── Left column ── */
+#left{
+  display:flex;flex-direction:column;
+  flex:1;min-width:0;min-height:0;
+  overflow:hidden
+}
+
+/* Canvas wrapper — fills available space */
+#canvas-outer{
+  flex:1;min-height:0;
+  padding:10px 10px 0 10px;
+  display:flex;flex-direction:column;
+  gap:6px
+}
+
+#canvas-wrap{
+  flex:1;min-height:80px;
+  background:var(--bg1);border:1px solid var(--border);border-radius:6px;
+  position:relative;overflow:hidden;cursor:crosshair
+}
+#canvas-wrap.panning{cursor:grab}
+#recoil-canvas{display:block;width:100%;height:100%}
+#canvas-hint{
+  position:absolute;bottom:6px;left:50%;transform:translateX(-50%);
+  font-family:var(--font-mono);font-size:9px;color:var(--text3);
+  background:rgba(14,15,17,.85);padding:2px 8px;border-radius:4px;
+  pointer-events:none;white-space:nowrap
+}
+
+/* Zoom bar */
+#zoom-bar{
+  display:flex;align-items:center;gap:8px;flex-shrink:0;
+  background:var(--bg2);border:1px solid var(--border);border-radius:5px;
+  padding:5px 10px
+}
+#zoom-bar label{font-family:var(--font-mono);font-size:10px;color:var(--text2);min-width:30px}
+#zoom-range{flex:1;accent-color:var(--accent)}
+#zoom-val{font-family:var(--font-mono);font-size:10px;color:var(--text);min-width:34px;text-align:right}
+
+/* ── Drag handle ── */
+#drag-handle{
+  height:7px;cursor:ns-resize;flex-shrink:0;
+  background:transparent;
+  border-top:1px solid var(--border);
+  margin:0 10px;
+  display:flex;align-items:center;justify-content:center
+}
+#drag-handle:hover,#drag-handle.dragging{background:rgba(77,156,255,.1)}
+#drag-handle::after{content:'';width:36px;height:2px;background:var(--border2);border-radius:2px}
+
+/* ── Shot area ── */
+#shot-area{
+  flex-shrink:0;
+  background:var(--bg1);border:1px solid var(--border);border-radius:6px;
+  display:flex;flex-direction:column;overflow:hidden;
+  margin:0 10px
+}
+#shot-area-head{
+  display:flex;align-items:center;padding:5px 10px;gap:8px;
+  border-bottom:1px solid var(--border);flex-shrink:0
+}
+#shot-area-head span{font-family:var(--font-mono);font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;flex:1}
+#shot-count{font-family:var(--font-mono);font-size:10px;color:var(--text3)}
+
+.toggle-group{display:flex;background:var(--bg0);border:1px solid var(--border);border-radius:4px;overflow:hidden}
+.toggle-btn{background:none;border:none;color:var(--text2);font-family:var(--font-mono);font-size:10px;padding:3px 10px;cursor:pointer;transition:background .15s,color .15s}
+.toggle-btn.active{background:var(--accent2);color:#fff}
+
+#shot-area-body{flex:1;min-height:0;overflow:hidden;position:relative}
+
+/* Table */
+#table-view{height:100%;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--border2) transparent}
+table{width:100%;border-collapse:collapse}
+thead th{
+  position:sticky;top:0;background:var(--bg2);z-index:1;
+  font-family:var(--font-mono);font-size:9px;color:var(--text3);
+  text-transform:uppercase;letter-spacing:.06em;
+  padding:5px 8px;text-align:left;border-bottom:1px solid var(--border)
+}
+thead th:first-child{width:36px;text-align:center}
+tbody tr{border-bottom:1px solid rgba(46,49,56,.5);transition:background .1s}
+tbody tr:hover{background:var(--bg2)}
+tbody tr:focus-within{background:rgba(77,156,255,.13)!important;outline:none}
+tbody tr:focus-within td:first-child{color:var(--accent)}
+tbody td{padding:0}
+
+.cell-input{width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:11px;padding:5px 8px;outline:none;transition:background .1s}
+.cell-input:focus{background:rgba(77,156,255,.08);color:var(--accent)}
+.del-btn{background:none;border:none;color:var(--text3);cursor:pointer;padding:4px 8px;font-size:10px;line-height:1}
+.del-btn:hover{color:var(--hot)}
+.row-num{font-family:var(--font-mono);font-size:10px;color:var(--text3);text-align:center;padding:4px 0;user-select:none;width:36px}
+
+/* Raw */
+#raw-view{height:100%;display:none;position:relative}
+#raw-textarea{width:100%;height:100%;background:var(--bg1);border:none;color:var(--text);font-family:var(--font-mono);font-size:11px;padding:10px;resize:none;outline:none;line-height:1.7}
+#raw-apply{position:absolute;bottom:10px;right:10px;background:var(--accent2);border:1px solid var(--accent);color:#fff;font-family:var(--font-mono);font-size:11px;padding:5px 12px;border-radius:4px;cursor:pointer}
+#raw-apply:hover{background:var(--accent)}
+
+/* ── Btn row ── */
+#btn-row{display:flex;gap:6px;flex-shrink:0;padding:8px 10px}
+.btn{background:var(--bg2);border:1px solid var(--border2);color:var(--text);font-family:var(--font-ui);font-size:12px;font-weight:500;padding:7px 14px;border-radius:5px;cursor:pointer;transition:background .15s;white-space:nowrap}
+.btn:hover{background:var(--bg3)}
+.btn.primary{background:var(--accent2);border-color:var(--accent);color:#fff}
+.btn.primary:hover{background:var(--accent)}
+.btn.danger{background:var(--hot2);border-color:var(--hot);color:#fff}
+.btn.danger:hover{background:var(--hot)}
+.btn-sm{background:var(--bg3);border:1px solid var(--border2);color:var(--text);font-family:var(--font-mono);font-size:10px;padding:3px 9px;border-radius:4px;cursor:pointer;transition:background .15s;white-space:nowrap}
+.btn-sm:hover{background:var(--border)}
+
+/* ── Right panel ── */
+#right{
+  width:220px;flex-shrink:0;
+  border-left:1px solid var(--border);background:var(--bg1);
+  display:flex;flex-direction:column;overflow:hidden
+}
+.panel-section{border-bottom:1px solid var(--border);padding:10px 12px}
+.panel-label{font-family:var(--font-mono);font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px}
+
+.input-row{display:flex;flex-direction:column;gap:3px;margin-bottom:7px}
+.input-row label{font-family:var(--font-mono);font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:.04em}
+.input-row input{background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:5px 8px;outline:none;width:100%;transition:border-color .15s}
+.input-row input:focus{border-color:var(--accent)}
+
+/* Datalist styling — cross browser limited, but we can style the input */
+/* Game combo */
+#game-combo{position:relative}
+#game-combo-input-wrap{display:flex;align-items:center;background:var(--bg2);border:1px solid var(--border);border-radius:4px;transition:border-color .15s}
+#game-combo-input-wrap:focus-within{border-color:var(--accent)}
+#inp-game{flex:1;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:5px 8px;outline:none;min-width:0}
+#game-new-badge{
+  display:none;align-items:center;justify-content:center;
+  width:22px;height:22px;margin-right:3px;flex-shrink:0;
+  background:var(--accent2);color:#fff;border-radius:3px;
+  font-size:14px;font-weight:500;cursor:pointer;line-height:1;
+  border:none;transition:background .15s
+}
+#game-new-badge:hover{background:var(--accent)}
+#game-dropdown{
+  display:none;position:absolute;top:100%;left:0;right:0;z-index:100;
+  background:var(--bg2);border:1px solid var(--border2);border-radius:4px;
+  margin-top:2px;max-height:160px;overflow-y:auto;
+  scrollbar-width:thin;scrollbar-color:var(--border2) transparent
+}
+#game-dropdown.open{display:block}
+.game-opt{
+  padding:6px 10px;font-family:var(--font-mono);font-size:11px;
+  color:var(--text2);cursor:pointer;transition:background .1s
+}
+.game-opt:hover,.game-opt.focused{background:var(--bg3);color:var(--text)}
+
+#pattern-list{flex:1;overflow-y:auto;padding:6px;scrollbar-width:thin;scrollbar-color:var(--border2) transparent}
+.game-group{}
+.game-header{
+  display:flex;align-items:center;gap:6px;padding:7px 6px 4px;
+  cursor:pointer;user-select:none;border-radius:4px;transition:background .1s
+}
+.game-header:hover{background:var(--bg3)}
+.game-chevron{font-size:9px;color:var(--text3);transition:transform .2s;display:inline-block}
+.game-group.open .game-chevron{transform:rotate(90deg)}
+.game-name-lbl{font-family:var(--font-mono);font-size:10px;color:var(--accent);letter-spacing:.06em;text-transform:uppercase;flex:1}
+.game-count{font-family:var(--font-mono);font-size:9px;color:var(--text3);background:var(--bg3);border-radius:3px;padding:1px 5px}
+.game-weapons{display:none;padding:0 0 4px 10px}
+.game-group.open .game-weapons{display:block}
+.pattern-row{display:flex;align-items:center;background:var(--bg2);border:1px solid var(--border);border-radius:4px;margin-bottom:2px;overflow:hidden;transition:border-color .15s}
+.pattern-row:hover{border-color:var(--border2)}
+.pattern-row.active-pattern{border-color:var(--accent);background:rgba(77,156,255,.08)}
+.pattern-load{flex:1;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:11px;padding:6px 8px;text-align:left;cursor:pointer;transition:color .15s}
+.pattern-load:hover{color:var(--accent)}
+.pattern-row.active-pattern .pattern-load{color:var(--accent)}
+.pattern-del{background:none;border:none;border-left:1px solid var(--border);color:var(--text3);font-size:11px;padding:6px 8px;cursor:pointer;transition:color .15s;line-height:1}
+.pattern-del:hover{color:var(--hot)}
+.empty-msg{font-family:var(--font-mono);font-size:10px;color:var(--text3);padding:16px 8px;text-align:center}
+#file-input{display:none}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div id="titlebar">
+    <h1>Recoil Editor</h1>
+    <div class="sep"></div>
+    <span id="ready-pill">ready</span>
+  </div>
+
+  <div id="body">
+
+    <!-- Left -->
+    <div id="left">
+      <div id="canvas-outer">
+        <div id="canvas-wrap">
+          <canvas id="recoil-canvas"></canvas>
+          <div id="canvas-hint">click=add &nbsp;·&nbsp; drag=move &nbsp;·&nbsp; right-click=delete/pan &nbsp;·&nbsp; space+drag=pan &nbsp;·&nbsp; scroll=zoom</div>
+        </div>
+        <div id="zoom-bar">
+          <label>Zoom</label>
+          <input type="range" id="zoom-range" min="50" max="2000" step="10" value="400">
+          <span id="zoom-val">2.0x</span>
+          <button class="btn-sm" onclick="fitAll()">Fit All</button>
+        </div>
+      </div>
+
+      <div id="drag-handle"></div>
+
+      <div id="shot-area">
+        <div id="shot-area-head">
+          <span>Shots</span>
+          <span id="shot-count">0 shots</span>
+          <div class="toggle-group">
+            <button class="toggle-btn active" id="btn-table" onclick="setView('table')">Table</button>
+            <button class="toggle-btn" id="btn-raw" onclick="setView('raw')">Raw</button>
+          </div>
+        </div>
+        <div id="shot-area-body">
+          <div id="table-view">
+            <table>
+              <thead><tr><th>#</th><th>X (left/right)</th><th>Y (up/down)</th><th>Duration ms</th><th></th></tr></thead>
+              <tbody id="shot-tbody"></tbody>
+            </table>
+          </div>
+          <div id="raw-view">
+            <textarea id="raw-textarea" spellcheck="false" placeholder="x,y,ms&#10;0,10,100&#10;2,15,100"></textarea>
+            <button id="raw-apply" onclick="applyRaw()">Apply</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="btn-row">
+        <button class="btn" onclick="addShot()">Add Shot</button>
+        <button class="btn" onclick="smoothShots()">Smooth</button>
+        <button class="btn danger" onclick="clearAll()">Clear All</button>
+      </div>
+    </div>
+
+    <!-- Right -->
+    <div id="right">
+      <div class="panel-section">
+        <div class="panel-label">Patterns</div>
+
+        <div class="input-row">
+          <label>Game</label>
+          <div id="game-combo">
+            <div id="game-combo-input-wrap">
+              <input type="text" id="inp-game" placeholder="type to search or create..." spellcheck="false" autocomplete="off" oninput="onGameInput()" onfocus="showGameDropdown()" onblur="hideGameDropdown()">
+              <button id="game-new-badge" title="Create new game — clears editor" onclick="createNewGame()">+</button>
+            </div>
+            <div id="game-dropdown"></div>
+          </div>
+        </div>
+        <div class="input-row">
+          <label>Weapon</label>
+          <input type="text" id="inp-weapon" placeholder="weapon name" spellcheck="false" autocomplete="off">
+        </div>
+        <button id="save-pattern-btn" class="btn primary" style="width:100%;margin-bottom:6px" onclick="savePattern()">Save Pattern</button>
+        <button class="btn" style="width:100%" onclick="document.getElementById('file-input').click()">Import CSV Vector</button>
+        <input type="file" id="file-input" accept=".txt" onchange="importFile(event)">
+      </div>
+      <div id="pattern-list"></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ── State ─────────────────────────────────────────────────────────────────────
+let shots=[], sel=-1, scale=400.0;
+let panX=0, panY=0, panning=false;
+let panSX=0, panSY=0, panOX=0, panOY=0;
+let spaceHeld=false, dragIdx=-1, dragOX=0, dragOY=0;
+let viewMode='table';
+const STORE_HEIGHT='recoil_shot_height';
+const STORE_SCALE ='recoil_scale';
+
+// ── Canvas ────────────────────────────────────────────────────────────────────
+const wrap  = document.getElementById('canvas-wrap');
+const canvas= document.getElementById('recoil-canvas');
+const ctx   = canvas.getContext('2d');
+
+function resizeCanvas(){
+  canvas.width =wrap.clientWidth;
+  canvas.height=wrap.clientHeight;
+  if(!panX&&!panY){panX=canvas.width>>1; panY=Math.floor(canvas.height*0.15);}
+  redraw();
+}
+new ResizeObserver(resizeCanvas).observe(wrap);
+
+function cumPos(){
+  const out=[]; let cx=panX,cy=panY;
+  for(const s of shots){cx+=s.x*scale;cy+=s.y*scale;out.push([cx,cy]);}
+  return out;
+}
+
+const GRID=40,DOT_R=5;
+function redraw(){
+  const W=canvas.width,H=canvas.height;
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='#0e0f11'; ctx.fillRect(0,0,W,H);
+  // Grid
+  ctx.strokeStyle='#1a1c20';ctx.lineWidth=1;ctx.beginPath();
+  const ox=((panX%GRID)+GRID)%GRID,oy=((panY%GRID)+GRID)%GRID;
+  for(let x=ox;x<W;x+=GRID){ctx.moveTo(x,0);ctx.lineTo(x,H)}
+  for(let y=oy;y<H;y+=GRID){ctx.moveTo(0,y);ctx.lineTo(W,y)}
+  ctx.stroke();
+  // Origin
+  ctx.strokeStyle='#3a3f48';ctx.lineWidth=1;ctx.beginPath();
+  ctx.moveTo(panX-12,panY);ctx.lineTo(panX+12,panY);
+  ctx.moveTo(panX,panY-12);ctx.lineTo(panX,panY+12);ctx.stroke();
+  ctx.fillStyle='#4a5060';ctx.font='9px JetBrains Mono,monospace';
+  ctx.fillText('start',panX+6,panY-4);
+  if(!shots.length){
+    ctx.fillStyle='#2e3138';ctx.font='12px JetBrains Mono,monospace';
+    ctx.textAlign='center';ctx.fillText('click to place shots or load a pattern →',W/2,H/2);
+    ctx.textAlign='left';return;
+  }
+  const pos=cumPos();let px=panX,py=panY;
+  ctx.setLineDash([4,4]);ctx.lineWidth=1.5;
+  for(let i=0;i<pos.length;i++){
+    ctx.strokeStyle=i===sel?'rgba(255,77,109,.7)':'rgba(77,156,255,.3)';
+    ctx.beginPath();ctx.moveTo(px,py);ctx.lineTo(pos[i][0],pos[i][1]);ctx.stroke();
+    px=pos[i][0];py=pos[i][1];
+  }
+  ctx.setLineDash([]);
+  for(let i=0;i<pos.length;i++){
+    const[x,y]=pos[i],s=i===sel,r=s?DOT_R+2:DOT_R;
+    if(s){ctx.beginPath();ctx.arc(x,y,r+5,0,Math.PI*2);ctx.fillStyle='rgba(255,77,109,.12)';ctx.fill()}
+    ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);
+    ctx.fillStyle=s?'#ff4d6d':'#4d9cff';ctx.fill();
+    ctx.fillStyle='#4a5060';ctx.font='9px JetBrains Mono,monospace';
+    ctx.fillText(String(i+1),x+DOT_R+2,y-DOT_R+2);
+  }
+}
+
+function hitTest(mx,my){
+  const pos=cumPos();
+  for(let i=pos.length-1;i>=0;i--){
+    const dx=mx-pos[i][0],dy=my-pos[i][1];
+    if(Math.sqrt(dx*dx+dy*dy)<=DOT_R+5)return i;
+  }
+  return -1;
+}
+
+canvas.addEventListener('contextmenu',e=>e.preventDefault());
+canvas.addEventListener('mousedown',e=>{
+  const r=canvas.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top;
+  if(e.button===1||e.button===2||spaceHeld){e.preventDefault();panning=true;panSX=e.clientX;panSY=e.clientY;panOX=panX;panOY=panY;wrap.classList.add('panning');return}
+  const hit=hitTest(mx,my);
+  if(hit>=0){sel=hit;dragIdx=hit;const pos=cumPos();dragOX=mx-pos[hit][0];dragOY=my-pos[hit][1];}
+  else{
+    const pos=cumPos(),prev=pos.length?pos[pos.length-1]:[panX,panY];
+    shots.push({x:+((mx-prev[0])/scale).toFixed(2),y:+((my-prev[1])/scale).toFixed(2),ms:100});
+    sel=shots.length-1;dragIdx=-1;
+  }
+  refresh();
+});
+canvas.addEventListener('mousemove',e=>{
+  if(panning){panX=panOX+(e.clientX-panSX);panY=panOY+(e.clientY-panSY);redraw();return}
+  if(dragIdx<0)return;
+  const r=canvas.getBoundingClientRect(),mx=e.clientX-r.left-dragOX,my=e.clientY-r.top-dragOY;
+  const pos=cumPos(),prev=dragIdx>0?pos[dragIdx-1]:[panX,panY];
+  shots[dragIdx].x=+((mx-prev[0])/scale).toFixed(2);
+  shots[dragIdx].y=+((my-prev[1])/scale).toFixed(2);
+  refresh();
+});
+canvas.addEventListener('mouseup',()=>{if(panning){panning=false;wrap.classList.remove('panning')}dragIdx=-1;});
+canvas.addEventListener('mouseup',e=>{
+  if(e.button===2&&panning){
+    // Check if we barely moved — treat as right-click delete
+    const moved=Math.abs(e.clientX-panSX)+Math.abs(e.clientY-panSY);
+    if(moved<5){
+      const r=canvas.getBoundingClientRect(),hit=hitTest(e.clientX-r.left,e.clientY-r.top);
+      if(hit>=0){shots.splice(hit,1);sel=Math.min(sel,shots.length-1);refresh();}
+    }
+  }
+});
+canvas.addEventListener('wheel',e=>{
+  e.preventDefault();
+  scale=Math.max(50,Math.min(2000,scale*(e.deltaY<0?1.1:0.9)));
+  document.getElementById('zoom-range').value=scale;
+  document.getElementById('zoom-val').textContent=scale.toFixed(1)+'x';
+  localStorage.setItem(STORE_SCALE,scale);
+  redraw();
+},{passive:false});
+document.addEventListener('keydown',e=>{if(e.code==='Space'&&e.target.tagName!=='INPUT'&&e.target.tagName!=='TEXTAREA'){e.preventDefault();spaceHeld=true;wrap.classList.add('panning')}});
+document.addEventListener('keyup',e=>{if(e.code==='Space'){spaceHeld=false;panning=false;wrap.classList.remove('panning')}});
+document.getElementById('zoom-range').addEventListener('input',e=>{
+  scale=parseFloat(e.target.value);
+  document.getElementById('zoom-val').textContent=scale.toFixed(1)+'x';
+  localStorage.setItem(STORE_SCALE,scale);
+  redraw();
+});
+
+function fitAll(){
+  if(!shots.length){panX=canvas.width>>1;panY=30;scale=400;}
+  else{
+    let xs=[0],ys=[0],cx=0,cy=0;
+    for(const s of shots){cx+=s.x;cy+=s.y;xs.push(cx);ys.push(cy);}
+    const mnX=Math.min(...xs),mxX=Math.max(...xs),mnY=Math.min(...ys),mxY=Math.max(...ys);
+    const pad=50;
+    scale=Math.max(50,Math.min(2000,Math.min((canvas.width-pad*2)/(mxX-mnX||1),(canvas.height-pad*2)/(mxY-mnY||1))));
+    panX=Math.floor(canvas.width/2-(mnX+(mxX-mnX)/2)*scale);
+    panY=Math.floor(pad-mnY*scale);
+  }
+  document.getElementById('zoom-range').value=scale;
+  document.getElementById('zoom-val').textContent=scale.toFixed(1)+'x';
+  localStorage.setItem(STORE_SCALE,scale);
+  redraw();
+}
+
+// ── Drag handle — resize shot area ───────────────────────────────────────────
+(function(){
+  const handle   =document.getElementById('drag-handle');
+  const shotArea =document.getElementById('shot-area');
+  let dragging=false,startY=0,startH=0;
+
+  const saved=localStorage.getItem(STORE_HEIGHT);
+  shotArea.style.height=(saved?saved+'px':'240px');
+
+  handle.addEventListener('mousedown',e=>{
+    dragging=true;startY=e.clientY;startH=shotArea.offsetHeight;
+    handle.classList.add('dragging');
+    document.body.style.userSelect='none';
+    document.body.style.cursor='ns-resize';
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    const newH=Math.max(100,Math.min(700,startH-(e.clientY-startY)));
+    shotArea.style.height=newH+'px';
+  });
+  document.addEventListener('mouseup',()=>{
+    if(!dragging)return;
+    dragging=false;handle.classList.remove('dragging');
+    document.body.style.userSelect='';document.body.style.cursor='';
+    localStorage.setItem(STORE_HEIGHT,shotArea.offsetHeight);
+  });
+})();
+
+// ── View toggle ───────────────────────────────────────────────────────────────
+function setView(mode){
+  viewMode=mode;
+  document.getElementById('btn-table').classList.toggle('active',mode==='table');
+  document.getElementById('btn-raw').classList.toggle('active',mode==='raw');
+  document.getElementById('table-view').style.display=mode==='table'?'block':'none';
+  document.getElementById('raw-view').style.display=mode==='raw'?'block':'none';
+  if(mode==='raw')syncRaw();
+}
+function syncRaw(){document.getElementById('raw-textarea').value=shots.map(s=>`${s.x},${s.y},${s.ms}`).join('\n');}
+function applyRaw(){shots=parseTxt(document.getElementById('raw-textarea').value);sel=-1;setView('table');refresh();}
+
+// ── Table — stable DOM, never rebuilt from scratch ───────────────────────────
+// Rows and inputs are created once. On data change we update .value in place.
+// Selection only toggles a CSS class — no DOM rebuild.
+
+const tbody = document.getElementById('shot-tbody');
+
+function ensureRows(){
+  // Add missing rows
+  while(tbody.rows.length < shots.length){
+    const i   = tbody.rows.length;
+    const tr  = tbody.insertRow();
+    tr.dataset.idx = i;
+
+    // Row number cell
+    const tdN = tr.insertCell();
+    tdN.className = 'row-num';
+
+    // X, Y, ms cells
+    for(const[key,type] of [['x','float'],['y','float'],['ms','int']]){
+      const td  = tr.insertCell();
+      const inp = document.createElement('input');
+      inp.className   = 'cell-input';
+      inp.dataset.key = key;
+      inp.dataset.type= type;
+
+      inp.addEventListener('focus', () => {
+        const rowIdx = parseInt(inp.closest('tr').dataset.idx);
+        if(sel !== rowIdx){
+          sel = rowIdx;
+          redraw();
+        }
+      });
+
+      inp.addEventListener('change', () => {
+        const rowIdx = parseInt(inp.closest('tr').dataset.idx);
+        const v = type==='int' ? parseInt(inp.value) : parseFloat(inp.value);
+        if(!isNaN(v)){
+          shots[rowIdx][key] = v;
+          redraw();
+          if(viewMode==='raw') syncRaw();
+        } else {
+          inp.value = shots[rowIdx][key]; // revert bad input
+        }
+      });
+
+      inp.addEventListener('keydown', e => {
+        const rowIdx = parseInt(inp.closest('tr').dataset.idx);
+        const allInp = [...tbody.querySelectorAll('.cell-input')];
+        const pos    = allInp.indexOf(inp);
+
+        if(e.key === 'Enter'){
+          e.preventDefault();
+          // Move to same column, next row
+          const next = allInp[pos + 3];
+          if(next) next.focus();
+          else { addShot(); setTimeout(()=>{ const a=[...tbody.querySelectorAll('.cell-input')]; a[a.length-3]?.focus(); },20); }
+        }
+        else if(e.key === 'ArrowDown'){
+          e.preventDefault();
+          const next = allInp[pos + 3];
+          if(next) next.focus();
+        }
+        else if(e.key === 'ArrowUp'){
+          e.preventDefault();
+          const prev = allInp[pos - 3];
+          if(prev) prev.focus();
+        }
+        else if(e.key === 'Tab'){
+          // Let tab move naturally to next cell
+        }
+        else if(e.key === 'Delete' && e.shiftKey){
+          e.preventDefault();
+          shots.splice(rowIdx, 1);
+          sel = Math.min(sel, shots.length - 1);
+          syncTable(); redraw(); updateCount();
+          if(viewMode==='raw') syncRaw();
+        }
+      });
+
+      td.appendChild(inp);
+    }
+
+    // Delete button cell
+    const tdD  = tr.insertCell();
+    const del  = document.createElement('button');
+    del.textContent = '✕';
+    del.className   = 'del-btn';
+    del.addEventListener('click', e => {
+      e.stopPropagation();
+      const rowIdx = parseInt(del.closest('tr').dataset.idx);
+      shots.splice(rowIdx, 1);
+      sel = Math.min(sel, shots.length - 1);
+      syncTable(); redraw(); updateCount();
+      if(viewMode==='raw') syncRaw();
+    });
+    tdD.appendChild(del);
+  }
+
+  // Remove extra rows (e.g. after clear)
+  while(tbody.rows.length > shots.length){
+    tbody.deleteRow(tbody.rows.length - 1);
+  }
+
+  // Update row indices stored in dataset (needed after splice)
+  for(let i=0; i<tbody.rows.length; i++){
+    tbody.rows[i].dataset.idx = i;
+  }
+}
+
+function syncTable(){
+  ensureRows();
+  for(let i=0; i<shots.length; i++){
+    const tr   = tbody.rows[i];
+    const inps = tr.querySelectorAll('.cell-input');
+    // Only update value if input is not currently focused
+    // (don't clobber what user is typing)
+    if(document.activeElement !== inps[0]) inps[0].value = shots[i].x;
+    if(document.activeElement !== inps[1]) inps[1].value = shots[i].y;
+    if(document.activeElement !== inps[2]) inps[2].value = shots[i].ms;
+    tr.querySelector('.row-num').textContent = i + 1;
+  }
+  // Scroll selected into view
+  if(sel >= 0 && sel < tbody.rows.length){
+    tbody.rows[sel].scrollIntoView({block:'nearest'});
+  }
+}
+
+
+function updateCount(){document.getElementById('shot-count').textContent=`${shots.length} shot${shots.length!==1?'s':''}`;}
+
+function refresh(){
+  syncTable();
+  if(viewMode==='raw') syncRaw();
+  updateCount();
+  redraw();
+}
+
+// ── Shot ops ──────────────────────────────────────────────────────────────────
+function addShot(){
+  let x=0, y=0, ms=100;
+  if(shots.length >= 2){
+    // Average the last 3 shots to continue the pattern naturally
+    const last = shots.slice(-3);
+    x  = parseFloat((last.reduce((a,s)=>a+s.x,0)/last.length).toFixed(2));
+    y  = parseFloat((last.reduce((a,s)=>a+s.y,0)/last.length).toFixed(2));
+    ms = Math.round(last.reduce((a,s)=>a+s.ms,0)/last.length);
+  } else if(shots.length === 1){
+    x=shots[0].x; y=shots[0].y; ms=shots[0].ms;
+  }
+  shots.push({x,y,ms}); sel=shots.length-1; refresh();
+  setTimeout(()=>{const tv=document.getElementById('table-view');tv.scrollTop=tv.scrollHeight;},10);
+}
+function clearAll(){
+  if(!shots.length)return;
+  if(!confirm('Clear all shots? This cannot be undone.'))return;
+  shots=[];sel=-1;refresh();
+}
+function smoothShots(){
+  if(shots.length<3)return;
+  const ox=shots.map(s=>s.x),oy=shots.map(s=>s.y);
+  for(let i=1;i<shots.length-1;i++){
+    shots[i].x=+((ox[i-1]+ox[i]+ox[i+1])/3).toFixed(2);
+    shots[i].y=+((oy[i-1]+oy[i]+oy[i+1])/3).toFixed(2);
+  }
+  refresh();
+}
+
+// ── Import ────────────────────────────────────────────────────────────────────
+function parseTxt(text){
+  return text.split('\n').filter(l=>l.trim()).map(l=>{
+    const p=l.split(',');
+    return{x:parseFloat(p[0]),y:parseFloat(p[1]),ms:parseInt(p[2])};
+  }).filter(s=>!isNaN(s.x)&&!isNaN(s.y)&&!isNaN(s.ms));
+}
+
+function importFile(event){
+  const file=event.target.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      shots=parseTxt(e.target.result);
+      sel=-1;
+      document.getElementById('inp-weapon').value=file.name.replace(/\.txt$/,'');
+      refresh();fitAll();
+      setStatus(`Imported ${shots.length} shots from ${file.name}`);
+    }catch(err){alert('Import failed: '+err.message);}
+  };
+  reader.readAsText(file);
+  event.target.value='';
+}
+
+// ── Game combo ────────────────────────────────────────────────────────────────
+let allGames=[], dropdownOpen=false;
+
+function updateGameDropdown(games){
+  allGames=games;
+  renderGameOpts(games);
+}
+
+function renderGameOpts(games){
+  const dd=document.getElementById('game-dropdown');
+  dd.innerHTML='';
+  if(!games.length){dd.innerHTML='<div class="game-opt" style="color:var(--text3)">no games yet</div>';return;}
+  games.forEach(g=>{
+    const div=document.createElement('div');
+    div.className='game-opt';div.textContent=g;
+    div.addEventListener('mousedown',e=>{
+      e.preventDefault(); // prevent blur before click
+      document.getElementById('inp-game').value=g;
+      updateNewBadge(g);
+      hideGameDropdown();
+    });
+    dd.appendChild(div);
+  });
+}
+
+function onGameInput(){
+  const val=document.getElementById('inp-game').value.trim().toLowerCase();
+  const filtered=allGames.filter(g=>g.toLowerCase().includes(val));
+  renderGameOpts(filtered);
+  updateNewBadge(val);
+  showGameDropdown();
+}
+
+function updateNewBadge(val){
+  const badge=document.getElementById('game-new-badge');
+  const saveBtn=document.getElementById('save-pattern-btn');
+  const isNew=val&&!allGames.map(g=>g.toLowerCase()).includes(val.toLowerCase());
+  badge.style.display=isNew?'flex':'none';
+  if(saveBtn) saveBtn.textContent='Save Pattern';
+}
+
+function createNewGame(){
+  const game=document.getElementById('inp-game').value.trim();
+  if(!game) return;
+  // Clear editor and set defaults
+  shots=[]; sel=-1;
+  activePattern=null;
+  document.getElementById('inp-weapon').value='new_weapon';
+  document.getElementById('game-new-badge').style.display='none';
+  // Add to allGames immediately so it shows as existing
+  if(!allGames.includes(game)) allGames.push(game);
+  updateNewBadge(game);
+  refresh();
+  setStatus(`New game: ${game} — add shots then Save Pattern`);
+}
+
+function showGameDropdown(){
+  dropdownOpen=true;
+  document.getElementById('game-dropdown').classList.add('open');
+}
+
+function hideGameDropdown(){
+  setTimeout(()=>{
+    dropdownOpen=false;
+    document.getElementById('game-dropdown').classList.remove('open');
+  },150);
+}
+
+function getGame(){
+  return document.getElementById('inp-game').value.trim()||'default';
+}
+
+// ── Pattern API ───────────────────────────────────────────────────────────────
+// Track which games are expanded and which pattern is active
+const expandedGames = new Set();
+let activePattern = null; // {game, weapon}
+
+async function loadPatterns(){
+  try{
+    const data=await(await fetch('/api/patterns')).json();
+    const games=Object.keys(data).sort();
+    updateGameDropdown(games);
+    const list=document.getElementById('pattern-list');
+    list.innerHTML='';
+    if(!games.length){list.innerHTML='<div class="empty-msg">no patterns saved</div>';return;}
+
+    for(const game of games){
+      const weapons=data[game];
+      const isOpen=expandedGames.has(game);
+
+      const group=document.createElement('div');
+      group.className='game-group'+(isOpen?' open':'');
+
+      // Header
+      const header=document.createElement('div');
+      header.className='game-header';
+      header.innerHTML=`
+        <span class="game-chevron">▶</span>
+        <span class="game-name-lbl">${game}</span>
+        <span class="game-count">${weapons.length}</span>`;
+      header.addEventListener('click',()=>{
+        group.classList.toggle('open');
+        if(group.classList.contains('open')) expandedGames.add(game);
+        else expandedGames.delete(game);
+      });
+      group.appendChild(header);
+
+      // Weapons
+      const weaponList=document.createElement('div');
+      weaponList.className='game-weapons';
+      for(const weapon of weapons){
+        const isActive=activePattern&&activePattern.game===game&&activePattern.weapon===weapon;
+        const row=document.createElement('div');
+        row.className='pattern-row'+(isActive?' active-pattern':'');
+        const lb=document.createElement('button');lb.className='pattern-load';lb.textContent=weapon;
+        lb.addEventListener('click',()=>loadPattern(game,weapon));
+        const db=document.createElement('button');db.className='pattern-del';db.textContent='✕';
+        db.addEventListener('click',()=>deletePattern(game,weapon));
+        row.appendChild(lb);row.appendChild(db);
+        weaponList.appendChild(row);
+      }
+      group.appendChild(weaponList);
+      list.appendChild(group);
+    }
+  }catch(e){console.error(e);}
+}
+
+async function loadPattern(game,weapon){
+  try{
+    const text=await(await fetch(`/api/patterns/${game}/${weapon}`)).text();
+    shots=parseTxt(text);sel=-1;
+    document.getElementById('inp-game').value=game;
+    updateNewBadge(game);
+    document.getElementById('inp-weapon').value=weapon;
+    activePattern={game,weapon};
+    expandedGames.add(game);
+    refresh();fitAll();loadPatterns();
+    setStatus(`${game}/${weapon}  (${shots.length} shots)`);
+  }catch(e){alert('Load failed: '+e);}
+}
+
+async function savePattern(){
+  const game=getGame();
+  const weapon=document.getElementById('inp-weapon').value.trim()||'pattern';
+  try{
+    const body=shots.map(s=>`${s.x},${s.y},${s.ms}`).join('\n');
+    await fetch(`/api/patterns/${game}/${weapon}`,{method:'POST',headers:{'Content-Type':'text/plain'},body});
+    setStatus(`Saved  ${game}/${weapon}`);
+    loadPatterns();
+    updateNewBadge(game);
+  }catch(e){alert('Save failed: '+e);}
+}
+
+async function deletePattern(game,weapon){
+  if(!confirm(`Delete ${game}/${weapon}?`))return;
+  await fetch(`/api/patterns/${game}/${weapon}`,{method:'DELETE'});
+  loadPatterns();
+}
+
+function setStatus(msg){
+  const el=document.getElementById('ready-pill');
+  el.textContent=msg;
+  setTimeout(()=>el.textContent='ready',3000);
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+// Restore saved scale
+const savedScale=localStorage.getItem(STORE_SCALE);
+if(savedScale){scale=parseFloat(savedScale);document.getElementById('zoom-range').value=scale;document.getElementById('zoom-val').textContent=scale.toFixed(1)+'x';}
+
+setView('table');
+loadPatterns();
+refresh();
+setInterval(loadPatterns,5000);
+</script>
+</body>
+</html>
